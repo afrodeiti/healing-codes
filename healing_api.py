@@ -150,28 +150,3 @@ def run_intention():
         "boost": boost,
         "multiplier": multiplier
     })
-📦 Update requirements.txt
-Make sure these lines are included:
-
-nginx
-Copy
-Edit
-flask
-pandas
-rapidfuzz
-You do not need to install hashlib — it's built-in.
-
-🧪 Example PowerShell Call (Using All Options)
-powershell
-Copy
-Edit
-Invoke-RestMethod -Uri "https://healing-codes-production.up.railway.app/run-intention" 
-    -Method POST 
-    -Headers @{"Content-Type"="application/json"} 
-    -Body '{
-      "intention": "I am divinely protected",
-      "duration": 10,
-      "frequency": 2.0,
-      "boost": true,
-      "multiplier": 3
-    }'
