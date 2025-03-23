@@ -2,46 +2,44 @@ from flask import Flask, request, jsonify
 import re
 import threading
 import time
-import hashlib
 from rapidfuzz import process, fuzz
+import hashlib
 
 app = Flask(__name__)
 
-# ---------------------------------------------
-# HEALING CODE LOGIC (TXT ONLY)
-# ---------------------------------------------
-
+# Load healing codes from TXT file only
 def load_healing_codes_from_txt():
+    codes = []
     try:
-        codes = []
+        current_category = None
         with open("healing_codes.txt", "r", encoding="utf-8") as file:
-            current_category = None
             for line in file:
                 line = line.strip()
-                if line.isupper():
-                    current_category = line
-                elif re.match(r'^\d+.*-.*$', line):  # Format: 88 71 623 - for emotional resilience
-                    parts = line.split("-", 1)
-                    if len(parts) == 2:
-                        code = parts[0].strip()
-                        meaning = parts[1].strip()
-                        keywords = re.findall(r'\b\w+\b', meaning.lower())
-                        if current_category:
-                            keywords.append(current_category.lower())
-                        codes.append({
-                            "code": code,
-                            "meaning": meaning,
-                            "keywords": keywords
-                        })
-        return codes
-    except Exception as e:
-        print(f"❌ Error loading TXT: {e}")
-        return []
 
-# Load data
+                # Identify category headers
+                if line.isupper() and len(line.split()) < 10:
+                    current_category = line
+                    continue
+
+                # Match "CODE - MEANING" format
+                if re.match(r'^\d[\d\s]+ - .+', line):
+                    code, meaning = line.split("-", 1)
+                    code = code.strip()
+                    meaning = meaning.strip()
+                    keywords = re.findall(r'\b\w+\b', meaning.lower())
+                    if current_category:
+                        keywords.append(current_category.lower())
+                    codes.append({
+                        "code": code,
+                        "meaning": meaning,
+                        "keywords": keywords
+                    })
+    except Exception as e:
+        print(f"❌ Failed to load healing codes: {e}")
+    return codes
+
 healing_codes = load_healing_codes_from_txt()
 all_keywords = list(set(keyword for entry in healing_codes for keyword in entry["keywords"]))
-
 
 @app.route('/get-healing-code', methods=['POST'])
 def get_healing_code():
@@ -49,25 +47,28 @@ def get_healing_code():
     issue = data.get("issue", "").lower()
     limit = data.get("limit", None)
 
-    print(f"\n🔍 Searching for issue: {issue}")
+    print(f"🔍 Searching for issue: {issue}")
     unique_codes = {}
 
-    # Step 1: Exact match of keywords
+    # Exact match first
     for entry in healing_codes:
         if issue in entry["keywords"]:
             unique_codes[entry["code"]] = entry
 
-    # Step 2: Fuzzy fallback (tight threshold)
+    # Fuzzy match only if no exact
     if not unique_codes:
-        print("⚠️ No exact match. Trying fuzzy match...")
         best_match, score = process.extractOne(issue, all_keywords, scorer=fuzz.partial_ratio)
-        print(f"🔍 Best fuzzy match: {best_match} (Score: {score})")
+        print(f"🌀 Fuzzy match: {best_match} (score {score})")
         if score >= 92:
             for entry in healing_codes:
                 if best_match in entry["keywords"]:
                     unique_codes[entry["code"]] = entry
 
-    matched_codes = list(unique_codes.values())
+    # Filter safe code formats (e.g. no made-up short strings)
+    matched_codes = [
+        entry for entry in unique_codes.values()
+        if re.match(r'^\d[\d\s]{6,}$', entry["code"])
+    ]
 
     if matched_codes:
         if limit and isinstance(limit, int):
@@ -79,11 +80,7 @@ def get_healing_code():
 
     return jsonify({"message": "No healing code found for this issue."})
 
-
-# ---------------------------------------------
-# INTENTION REPEATER LOGIC
-# ---------------------------------------------
-
+# INTENTION BROADCASTING
 @app.route('/run-intention', methods=['POST'])
 def run_intention():
     data = request.json
@@ -97,25 +94,24 @@ def run_intention():
         return jsonify({"success": False, "message": "No intention provided."}), 400
 
     def sha512(message):
-        return hashlib.sha512(message.encode('utf-8')).hexdigest().upper()
+        return hashlib.sha512(message.encode("utf-8")).hexdigest().upper()
 
-    def repeat_intention():
-        start_time = time.time()
+    def repeater():
+        start = time.time()
         total_iterations = 0
         interval = (1 / frequency) if frequency > 0 else 0.001
 
-        while time.time() - start_time < duration:
+        while time.time() - start < duration:
             text_to_hash = intention
             if boost:
-                text_to_hash = sha512(text_to_hash + ': ' + intention)
-            hash_result = sha512(text_to_hash)
+                text_to_hash = sha512(f"{text_to_hash}:{intention}")
+            _ = sha512(text_to_hash)
             total_iterations += multiplier
-            print(f"🔁 [{total_iterations}] {hash_result[:16]}...")
             time.sleep(interval)
 
-        print(f"✅ Finished repeating: {intention} — Total Iterations: {total_iterations}")
+        print(f"✅ Finished repeating: {intention} ({total_iterations} iterations)")
 
-    threading.Thread(target=repeat_intention).start()
+    threading.Thread(target=repeater).start()
 
     return jsonify({
         "success": True,
@@ -126,9 +122,5 @@ def run_intention():
         "multiplier": multiplier
     })
 
-
-# ---------------------------------------------
-# START THE SERVER
-# ---------------------------------------------
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5001, debug=True)
