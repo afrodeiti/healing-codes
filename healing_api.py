@@ -122,5 +122,38 @@ def run_intention():
         "multiplier": multiplier
     })
 
+# NEW: PAST LIFE LOGGING ENDPOINT
+@app.route('/log-past-life-request', methods=['POST'])
+def log_past_life_request():
+    data = request.json
+    user_prompt = data.get("prompt", "")
+    user_id = data.get("user_id", "anonymous")
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+
+    print(f"[📜 Past Life Log] {timestamp} | User: {user_id} | Prompt: {user_prompt}")
+
+    # Optional: Energetic support intention
+    def broadcast_activation():
+        intention = "Past life insight is received with clarity, healing, and divine permission. 32 27 5427"
+        duration = 120
+        frequency = 3
+        multiplier = 3
+        boost = True
+
+        interval = 1 / frequency if frequency > 0 else 0.001
+        start_time = time.time()
+        while time.time() - start_time < duration:
+            hash_output = hashlib.sha512(intention.encode()).hexdigest()[:12]
+            print(f"🔁 Past life intention hash: {hash_output}")
+            time.sleep(interval)
+
+    threading.Thread(target=broadcast_activation).start()
+
+    return jsonify({
+        "success": True,
+        "message": "Past life request logged and soul alignment activated.",
+        "timestamp": timestamp
+    })
+
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5001, debug=True)
