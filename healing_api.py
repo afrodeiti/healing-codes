@@ -30,6 +30,57 @@ import math
 from datetime import datetime
 from rapidfuzz import process, fuzz
 from collections import Counter
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from sacred_computing_platform import (
+    SacredIntentionBroadcaster,
+    SacredGeometryCalculator,
+    SCHUMANN_RESONANCE
+)
+import asyncio
+app = FastAPI()
+class IntentionInput(BaseModel):
+    intention: str
+    frequency: float = SCHUMANN_RESONANCE
+    field_type: str = "torus"
+    amplify: bool = False
+    multiplier: float = 1.0
+
+@app.post("/api/broadcast-intention")
+def broadcast_intention(input: IntentionInput):
+    try:
+        result = asyncio.run(
+            SacredIntentionBroadcaster().broadcast_intention(
+                intention=input.intention,
+                frequency=input.frequency,
+                field_type=input.field_type,
+                amplify=input.amplify,
+                multiplier=input.multiplier
+            )
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/calculate-geometry")
+def calculate_geometry(input: IntentionInput):
+    try:
+        if input.field_type == "torus":
+            result = asyncio.run(SacredGeometryCalculator.torus_field_generator(input.intention, input.frequency))
+        elif input.field_type == "merkaba":
+            result = asyncio.run(SacredGeometryCalculator.merkaba_field_generator(input.intention, input.frequency))
+        elif input.field_type == "metatron":
+            result = asyncio.run(SacredGeometryCalculator.metatrons_cube_amplifier(input.intention, input.amplify))
+        elif input.field_type == "sri_yantra":
+            result = asyncio.run(SacredGeometryCalculator.sri_yantra_encoder(input.intention))
+        elif input.field_type == "flower_of_life":
+            result = asyncio.run(SacredGeometryCalculator.flower_of_life_pattern(input.intention, 60))
+        else:
+            raise ValueError("Unknown field_type")
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
